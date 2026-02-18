@@ -96,7 +96,7 @@ rocks_mid.facies = rock.facies(midlayer_ixs);
 rocks_mid.permz = rock.permz(midlayer_ixs);
 
 figure
-plotCellData(Gmid, log10(rocks_mid.perm/1e3), 'edgecolor', 'black'); colorbar
+plotCellData(Gmid, log10(rocks_mid.perm/1e3), 'edgecolor', 'black','edgealpha', 0.1); colorbar
 if slice_dir == 'y'
     view(0,0);
 else

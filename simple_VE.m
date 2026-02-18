@@ -108,7 +108,7 @@ schedule.step.control = [ones(31, 1); ...
                          ones(27, 1) * 2];
 %schedule.step.control = [ones(55, 1)]
 %ones(57, 1) * 2];
-% $$$ schedule.step.control = [ones(79, 1)];
+% schedule.step.control = [ones(79, 1)];
                          
 
 % run simulation
