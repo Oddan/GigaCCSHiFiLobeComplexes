@@ -6,10 +6,12 @@ mrstModule add mrst-gui
 
 gravity on
 do_plot=false;
+uniform=false;
 
-[G, rock, Gt, rockVE, transMult] = setup_testgrid();
+[G, rock, Gt, rockVE, transMult, G_orig, rock_orig] = setup_testgrid('uniform', uniform);
 
-
+%G = G_orig; % @@ hack
+%rock = rock_orig; % @@ hack
 
 %% determine wellcells (mid-bottom)
 tmp = zeros(G.cartDims);
@@ -52,8 +54,8 @@ cf_co2 = 0; % co2 compressibility
 cf_rock = 4.35e-5 / barsa; % rock compressibility
 srw = 0.1;
 src = 0.1;
-%n = [1,1]; % @@ relperm exponents
-n = [2,2]; % @@ relperm exponents
+n = [1,1]; % @@ relperm exponents
+%n = [2,2]; % @@ relperm exponents
 
 fluid = initSimpleADIFluid('phases', 'WG'           , ...
                            'mu'  , [muw, muc]       , ...
@@ -73,7 +75,7 @@ rock_modif.perm = [rock.perm, rock.perm, rock.permz];
 %rock_modif.perm = rock_modif.permz; % "Worst case"
 
 if do_plot
-    figure;plotCellData(G, rock_modif.perm/darcy, 'edgealpha', 0.1); view(0,0);
+    figure;plotCellData(G, rock_modif.perm(:,1)/darcy, 'edgealpha', 0.1); view(0,0);
     colorbar; title('permeability field');
 end
 
@@ -85,10 +87,19 @@ inj_rate = 500 * meter^3/day; %1000 * meter^3/day;
 W = addWell([], G, rock_modif, well_cells, 'Type', 'rate', 'Val', inj_rate, 'comp_i', [0, 1], 'name', 'Injector');
 open_boundaries = true;
 bc = open_boundary_conditions(G, pfun, open_boundaries);
+
+% remove boundary conditions on faces that are not at the rightmost lateral boundary
+tmp = G.faces.centroids(bc.face, 1); 
+bc_keep = tmp > 0;
+bc.face = bc.face(bc_keep);
+bc.type = bc.type(bc_keep);
+bc.value = bc.value(bc_keep);
+bc.sat = bc.sat(bc_keep,:);
+
 inj_period = 4*year;%60*day;
-inj_steps = 400; %40;
-migr_period = 10*year;
-migr_steps = 100; %100;
+inj_steps = 50; %100;%400; %40;
+migr_period = 100*year; %10*year;
+migr_steps = 50; %100;
 
 schedule = simple_injection_migration_schedule(W, bc, inj_period, inj_steps, ...
                                                migr_period, migr_steps);
@@ -96,7 +107,7 @@ schedule = simple_injection_migration_schedule(W, bc, inj_period, inj_steps, ...
 
 nls = NonLinearSolver('maxTimestepCuts', 14, ...
                       'timeStepSelector', ...
-                      IterationCountTimeStepSelector('targetIterationCount', 12));
+                      IterationCountTimeStepSelector('targetIterationCount', 12));2
 
 
 [wellsol, states] = simulateScheduleAD(initState, model, schedule, ...
@@ -113,6 +124,7 @@ for state_ix = 1:length(plotstates)
 end
 
 if do_plot
+    figure;
     plotToolbar(G, plotstates); view(0,0);
 end
 
@@ -148,6 +160,7 @@ fluidVE = makeVEFluid(Gt, rockVE                     , ...
                       'pvMult_fac'  , cf_rock        , ...
                       'kr3D'        , n              , ...
                       'transMult'   , transMult);
+                      %'transMult'   , []);
                       %'invPc3D'     , invPc3D        , ...
                       
 %% setup model
@@ -160,6 +173,11 @@ WVE = addWellVE([], Gt, rockVE, wcell, 'Type', 'rate', ...
 
 % schedule
 bcVE = open_boundary_conditions(Gt, pfun, open_boundaries);
+bcVE.face = bcVE.face(end); % get rid of open boundary on left side
+bcVE.type = bcVE.type(end); 
+bcVE.value = bcVE.value(end);
+bcVE.sat = bcVE.sat(end,:);
+
 scheduleVE = simple_injection_migration_schedule(WVE, bcVE, inj_period, inj_steps, ...
                                                migr_period, migr_steps);
 
@@ -168,7 +186,7 @@ scheduleVE = simple_injection_migration_schedule(WVE, bcVE, inj_period, inj_step
                                            'NonLinearSolver', nls);
 
 plotstatesVE = [{initStateVE}; statesVE];
-sat_VE3D = {};
+states_VE3D = {};
 % converting saturation results to 3D
 for i = 1:numel(plotstatesVE)
     s = plotstatesVE{i}.s(:,2);
@@ -179,13 +197,15 @@ for i = 1:numel(plotstatesVE)
                                     'poro', rock.poro, ...
                                     'rhoW', fluidVE.rhoW, ...
                                     'rhoG', fluidVE.rhoG, 'p', p);
-    sat_VE3D = [sat_VE3D, {height2finescaleSat(h, h_max, Gt, ...
-                                               fluidVE.res_water, fluidVE.res_gas, ...
-                                               'rhoW', fluidVE.rhoW(p), ...
-                                               'rhoG', fluidVE.rhoG(p))}];
+    cur_state.s = height2finescaleSat(h, h_max, Gt, ...
+                                      fluidVE.res_water, fluidVE.res_gas, ...
+                                      'rhoW', fluidVE.rhoW(p), ...
+                                      'rhoG', fluidVE.rhoG(p));
+    cur_state.pressure = pVE_to_p3D(Gt, p, fluidVE);
+    states_VE3D = [states_VE3D; {cur_state}];    
 end
 figure;
-plotToolbar(G, sat_VE3D); view(0,0);
+plotToolbar(G, states_VE3D); view(0,0);
 
 %% investigate
 % - impact of transmult on correspondence with 3D

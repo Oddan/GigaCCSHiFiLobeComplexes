@@ -1,4 +1,6 @@
-function [G, rock, Gt, rockVE, transMult] = setup_testgrid()
+function [G, rock, Gt, rockVE, transMult, G_orig, rock_orig] = setup_testgrid(varargin)
+
+    opt = merge_options(struct('uniform', false), varargin{:});
     
     % load grid slice and rock properties:
     ld = load('grids');
@@ -8,6 +10,14 @@ function [G, rock, Gt, rockVE, transMult] = setup_testgrid()
     rock = ld.rocks;           % Rock properties for the full grid slice
     rock = ld.rocks_mid;   % Rock properties for the middle section of the slice
 
+    if opt.uniform
+        rock.perm(:) = 100; % uniform permeability of 100 mD
+        rock.permz(:) = 100; % uniform vertical permeability of 10 mD
+        rock.poro(:) = 0.15; % uniform porosity of 20%
+        rock.ntg(:) = 1; % uniform net-to-gross of 1 (fully net)
+        rock.facies(:) = 1; % uniform facies of 1 (arbitrary choice)
+    end
+    
     % convert units
     rock.perm = rock.perm * milli * darcy; % from mD to Darcy
     rock.permz = rock.permz * milli * darcy; % from mD to Darcy
@@ -32,6 +42,8 @@ function [G, rock, Gt, rockVE, transMult] = setup_testgrid()
     % Define a simple vertical equilibrium grid
     [Gt, G, transMult, discarded_cells] = topSurfaceGrid(Gmid);
     
+    G_orig = Gmid; % store original grid before discarding cells
+    rock_orig = rock; % store original rock properties before discarding cells
     
     % loop over fields in rocks_mid and remove values corresponding to discarded
     % cells
