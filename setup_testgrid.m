@@ -40,7 +40,7 @@ function [G, rock, Gt, rockVE, transMult, G_orig, rock_orig] = setup_testgrid(va
     rock.facies = rock.facies(keep_cells);
     
     % Define a simple vertical equilibrium grid
-    [Gt, G, transMult, discarded_cells] = topSurfaceGrid(Gmid);
+    [Gt, G, transMult, discarded_cells] = topSurfaceGrid(Gmid, 'discard_below_holes', false);
     
     G_orig = Gmid; % store original grid before discarding cells
     rock_orig = rock; % store original rock properties before discarding cells

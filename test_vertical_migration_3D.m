@@ -3,6 +3,9 @@
 
 mrstModule add co2lab
 mrstModule add mrst-gui
+mrstModule add ad-core
+mrstModule add ad-props
+mrstModule add ad-blackoil
 
 gravity on
 do_plot=false;
