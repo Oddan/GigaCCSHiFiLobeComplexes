@@ -96,8 +96,8 @@ schedule.control(2) = struct('W', W, 'bc', bc);
 schedule.control(2).W.val = 0;
 
 % Specifying length of simulation timesteps
-% $$$ schedule.step.val = [rampupTimesteps(2*year, year/24, 7); ...
-% $$$                      repmat(1 * year, 250, 1)];
+% schedule.step.val = [rampupTimesteps(2*year, year/24, 7); ...
+%                      repmat(1 * year, 250, 1)];
 schedule.step.val = [rampupTimesteps(1*year, year/24, 7); ...
                      rampupTimesteps(100*year, 5 * year, 7)];
                      
