@@ -14,16 +14,16 @@ rocks.poro = rocks.poro; % porosity is unitless
 
 rockVE = averageRock(rocks, Gt)
 
+% Define temperature (from report)
+tfun = @(z) 273.15 + 62 + 0.025 * (z-2100); % temperature function in K, with depth z in m
 
-tsurf = 15 + 273.15; % surface temperature in K
-tgrad = 30; % temperature gradient in K/km
+rhow = 1021; % density of brine (kg/m^3), from report
 
-rhow = 1050; % density of brine (kg/m^3)
-
-pfun = @(z) 1 * atm + rhow * norm(gravity) * z;
+% pressure function in Pa, with depth z in m, reference depth is 2100 m
+pfun = @(z) 180 * barsa + rhow * norm(gravity) * (z-2100); % from report
 
 initState.pressure = pfun(Gt.cells.z);
-initState.temperature = tsurf + Gt.cells.z * tgrad / 1000; 
+initState.temperature = tfun(Gt.cells.z);
 initState.s = repmat([1, 0], Gt.cells.num, 1); % all water, no CO2
 initState.sGmax    = initState.s(:,2);
 initState.rs       = zeros(Gt.cells.num, 1);
@@ -39,36 +39,78 @@ p_ref = mean(initState.pressure);
 
 co2     = CO2props();                           % CO2 property functions
 co2_rho = co2.rho(p_ref, t_ref);                % CO2 density
-co2_c   = co2.rhoDP(p_ref, t_ref) / co2_rho;    % CO2 compressibility
-wat_c   = 4.3e-5/barsa;                         % water compressibility
-c_rock  = 3.0e-5 / barsa;                       % rock compressibility 
-srw     = 0.081;                                % residual water
-src     = 0.40;                                  % residual CO2
-pe      = 5 * kilo * Pascal;                    % capillary entry pressure
+%co2_c   = co2.rhoDP(p_ref, t_ref) / co2_rho;    % CO2 compressibility
+wat_c   = 5e-5/barsa;                           % water compressibility
+c_rock  = 5e-5 / barsa;                         % rock compressibility 
+srw     = 0.2  ;                                % residual water
+src     = 0.15;                                  % residual CO2
 muw     = 8e-4 * Pascal * second;               % brine viscosity
 muco2   = co2.mu(p_ref, t_ref) * Pascal * second; % co2 viscosity
-n = [2,2] ; % relperm exponents
+prange = [0.1, 400] * mega * Pascal; % pressure range for PVT tables
+trange = [  4, 250] + 274; % CO2 default temperature range for PVT tables, in K
+
+% cap pressure and relperm
+
+GSF = [0.000000 0.000000 0.000000
+       0.150000 0.000000 0.000000
+       0.215000 0.003686 0.018167
+       0.280000 0.024204 0.022506
+       0.345000 0.067386 0.028690
+       0.410000 0.132803 0.037971
+       0.475000 0.217969 0.052895
+       0.540000 0.320682 0.079363
+       0.605000 0.439928 0.133900
+       0.670000 0.575816 0.279863
+       0.735000 0.728993 0.986900
+       0.800000 0.900000 64.931419];
+
+WSF = [0.200000 0.000000
+       0.330000 0.000800
+       0.395000 0.004050
+       0.460000 0.012800
+       0.525000 0.031250
+       0.590000 0.064800
+       0.655000 0.120050
+       0.720000 0.204800
+       0.785000 0.328050
+       0.850000 0.500000
+       1.000000 0.500000];
+
+kr3D = @(sg) interp1(GSF(:,1), GSF(:,2), sg);
+
+swat = 1-GSF(:,1);
+pcval = GSF(:,3) * barsa;
+swat(2) = [];
+pcval(2) = []; % avoid degenerate table (and smooth out the jump in saturation)
+invPc3D = @(pc) interp1(pcval, swat, pc, 'linear', 'extrap');
+
+%pe = 2.5e-2 * barsa;
+%n = [2,2] ; % relperm exponents
+%invPc3D = @(pc) (1-srw) .* (pe./max(pc, pe)).^2 + srw;
+%kr3D    = @(s) max((s-src)./(1-src), 0).^2; % uses CO2 saturation
+
 
 % fluid
-invPc3D = @(pc) (1-srw) .* (pe./max(pc, pe)).^2 + srw;
-kr3D    = @(s) max((s-src)./(1-src), 0).^2; % uses CO2 saturation
 fluid   = makeVEFluid(Gt, rockVE, ...
-               'sharp_interface_integrated'           , ...
+               'P-scaled table'                       , ...
                'co2_mu_ref'  , muco2                  , ...
+               'co2_mu_pvt'  , [prange, trange]       , ...
                'wat_mu_ref'  , muw                    , ...
                'co2_rho_ref' , co2_rho                , ...
                'wat_rho_ref' , rhow                   , ...
-               'co2_rho_pvt' , [co2_c, p_ref]         , ...
                'wat_rho_pvt' , [wat_c, p_ref]         , ...
                'residual'    , [srw, src]             , ...
                'pvMult_p_ref', p_ref                  , ...
                'pvMult_fac'  , c_rock                 , ...
                'invPc3D'     , invPc3D                , ...
-               'kr3D'        , n                      , ... %kr3D                   , ...
+               'kr3D'        , kr3D                   , ... 
                'dissolution' , false, ... % set to 'true' if you want dissolution
                'dis_rate'    , Inf, ...
                'dis_max'     , 0.05, ...
                'transMult'   , transMult);
+               %'kr3D'        , n                      , ... %kr3D                   , ...
+               %'co2_rho_pvt' , [co2_c, p_ref]         , ... % default is sampled table
+               %'sharp_interface_integrated'           , ...
 
 % well position, with logical coordiantes i=129, j=10
 wcell = find(Gt.cells.ij(:,1) == 129 & Gt.cells.ij(:,2)==10);
