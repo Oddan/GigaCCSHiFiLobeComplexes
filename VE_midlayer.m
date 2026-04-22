@@ -21,7 +21,7 @@ rocksAlt.perm = rocks.perm(upper_ixs);
 rocksAlt.permz = rocks.permz(upper_ixs);
 rocksAlt.poro = rocks.poro(upper_ixs);
 rockVEAlt = averageRock(rocksAlt, GtAlt);
-%rockVE = rockVEAlt; % @@
+rockVE = rockVEAlt; % @@
 
 
 % Define temperature (from report)
@@ -51,11 +51,14 @@ co2     = CO2props();                           % CO2 property functions
 co2_rho = co2.rho(p_ref, t_ref);                % CO2 density
                                                 %co2_c   = co2.rhoDP(p_ref, t_ref) / co2_rho;    % CO2 compressibility
 wat_c   = 5e-5/barsa;                           % water compressibility
-c_rock  = 5e-5 / barsa;                         % rock compressibility 
+%c_rock  = 5e-5 / barsa;                         % rock compressibility
+%c_rock  = 8.75e-5 / barsa;                         % rock compressibility @@@
+c_rock  = 1e-4 / barsa;                         % rock compressibility @@@@
+
 srw     = 0.2  ;                                % residual water
 src     = 0.15;                                  % residual CO2
-muw     = 8e-4 * Pascal * second;               % brine viscosity
-muco2   = co2.mu(p_ref, t_ref) * Pascal * second; % co2 viscosity
+muw     = 5.946e-4; %@@8e-4 * Pascal * second;               % brine viscosity
+muco2   = co2.mu(p_ref, t_ref) * Pascal * second; % co2 viscosity (@@ note, value doesn't matter, since sampled table is used!)
 prange = [0.1, 400] * mega * Pascal; % pressure range for PVT tables
 trange = [  4, 250] + 274; % CO2 default temperature range for PVT tables, in K
 
@@ -86,7 +89,8 @@ GSF = [0.000000 0.000000 0.000000
 %        0.850000 0.500000
 %        1.000000 0.500000];
 
-kr3D = @(sg) interp1(GSF(:,1), GSF(:,2), sg);
+%kr3D = @(sg) interp1(GSF(:,1), GSF(:,2), sg);
+kr3D = @(sg) 0.7 * interp1(GSF(:,1), GSF(:,2), sg); % @@@  what happens if we reduce relperm
 
 swat = 1-GSF(:,1);
 pcval = GSF(:,3) * barsa;
@@ -103,7 +107,7 @@ invPc3D = @(pc) interp1(pcval, swat, pc, 'linear', 'extrap');
 % fluid
 fluid   = makeVEFluid(Gt, rockVE, ...
                       'P-scaled table'                       , ...
-                      'co2_mu_ref'  , muco2                  , ...
+                      'co2_mu_ref'  , muco2                  , ... % doesn't matter, since sampled table is used
                       'co2_mu_pvt'  , [prange, trange]       , ...
                       'wat_mu_ref'  , muw                    , ...
                       'co2_rho_ref' , co2_rho                , ...
@@ -119,6 +123,8 @@ fluid   = makeVEFluid(Gt, rockVE, ...
                       'dis_rate'    , Inf, ...
                       'dis_max'     , 0.05, ...
                       'transMult'   , transMult);
+
+%fluid.muG = @(p) 2 * fluid.muG(p); % @@@
 %'kr3D'        , n                      , ... %kr3D                   , ...
 %'co2_rho_pvt' , [co2_c, p_ref]         , ... % default is sampled table
 %'sharp_interface_integrated'           , ...
