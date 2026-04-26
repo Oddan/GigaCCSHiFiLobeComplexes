@@ -88,7 +88,7 @@ GSF = [0.000000 0.000000 0.000000
 %        1.000000 0.500000];
 
 kr3D = @(sg) interp1(GSF(:,1), GSF(:,2), sg);
-%kr3D = @(sg) 0.85 * interp1(GSF(:,1), GSF(:,2), sg); % @@@  what happens if we reduce relperm
+%kr3D = @(sg) 0.9 * interp1(GSF(:,1), GSF(:,2), sg); % @@@  what happens if we reduce relperm
 
 swat = 1-GSF(:,1);
 pcval = GSF(:,3) * barsa;
