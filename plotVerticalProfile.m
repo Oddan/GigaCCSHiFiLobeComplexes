@@ -1,4 +1,4 @@
-function plotVerticalProfile(Gt, field3D, i, j)
+function cell_ij = plotVerticalProfile(Gt, field3D, i, j)
     % determine the 2D cell index corresponding to the given (i,j) coordinates
     cell_ij = find(Gt.cells.ij(:,1) == i & Gt.cells.ij(:,2) == j);
     assert(numel(cell_ij) == 1, 'Expected exactly one cell for the given (i,j) coordinates');    
@@ -13,7 +13,6 @@ function plotVerticalProfile(Gt, field3D, i, j)
     field_values = field3D(colcells3D);
 
     % plot the vertical profile
-    figure;
     plot(field_values, z, '-o');
     set(gca, 'YDir', 'reverse'); % Reverse y-axis to have depth increasing
     xlabel('Field Value');

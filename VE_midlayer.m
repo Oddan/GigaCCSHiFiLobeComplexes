@@ -15,14 +15,14 @@ rocks.poro = rocks.poro; % porosity is unitless
 rockVE = averageRock(rocks, Gt)
 
 % @@ Alternative rock  --- @@ Experimental, use only the upper part of the grid to compute rock properties for VE
-upper_ixs = find(Gs.cells.indexMap <= 234*182*130);
+%upper_ixs = find(Gs.cells.indexMap <= 234*182*130);
+upper_ixs = find(Gs.cells.indexMap <= 234*182*(129+3));
 GtAlt = topSurfaceGrid(extractSubgrid(Gs, upper_ixs), 'discard_below_holes', false);
 rocksAlt.perm = rocks.perm(upper_ixs);
 rocksAlt.permz = rocks.permz(upper_ixs);
 rocksAlt.poro = rocks.poro(upper_ixs);
 rockVEAlt = averageRock(rocksAlt, GtAlt);
 rockVE = rockVEAlt; % @@
-
 
 % Define temperature (from report)
 tfun = @(z) 273.15 + 62 + 0.025 * (z-2100); % temperature function in K, with depth z in m
@@ -51,9 +51,7 @@ co2     = CO2props();                           % CO2 property functions
 co2_rho = co2.rho(p_ref, t_ref);                % CO2 density
                                                 %co2_c   = co2.rhoDP(p_ref, t_ref) / co2_rho;    % CO2 compressibility
 wat_c   = 5e-5/barsa;                           % water compressibility
-%c_rock  = 5e-5 / barsa;                         % rock compressibility
-%c_rock  = 8.75e-5 / barsa;                         % rock compressibility @@@
-c_rock  = 1e-4 / barsa;                         % rock compressibility @@@@
+c_rock  = 1e-4 / barsa;                         % rock compressibility, confirmed with Trine
 
 srw     = 0.2  ;                                % residual water
 src     = 0.15;                                  % residual CO2
@@ -89,13 +87,15 @@ GSF = [0.000000 0.000000 0.000000
 %        0.850000 0.500000
 %        1.000000 0.500000];
 
-%kr3D = @(sg) interp1(GSF(:,1), GSF(:,2), sg);
-kr3D = @(sg) 0.7 * interp1(GSF(:,1), GSF(:,2), sg); % @@@  what happens if we reduce relperm
+kr3D = @(sg) interp1(GSF(:,1), GSF(:,2), sg);
+%kr3D = @(sg) 0.85 * interp1(GSF(:,1), GSF(:,2), sg); % @@@  what happens if we reduce relperm
 
 swat = 1-GSF(:,1);
 pcval = GSF(:,3) * barsa;
-swat(2) = [];
-pcval(2) = []; % avoid degenerate table (and smooth out the jump in saturation)
+%swat(2) = [];
+%pcval(2) = []; % avoid degenerate table (and smooth out the jump in saturation)
+swat(1) = [];
+pcval(1) = []; % avoid degenerate table (and smooth out the jump in saturation)
 invPc3D = @(pc) interp1(pcval, swat, pc, 'linear', 'extrap');
 
 %pe = 2.5e-2 * barsa;
@@ -103,10 +103,10 @@ invPc3D = @(pc) interp1(pcval, swat, pc, 'linear', 'extrap');
 %invPc3D = @(pc) (1-srw) .* (pe./max(pc, pe)).^2 + srw;
 %kr3D    = @(s) max((s-src)./(1-src), 0).^2; % uses CO2 saturation
 
-
 % fluid
 fluid   = makeVEFluid(Gt, rockVE, ...
                       'P-scaled table'                       , ...
+                      'hyst_model'  , 'fixed residual'       , ...
                       'co2_mu_ref'  , muco2                  , ... % doesn't matter, since sampled table is used
                       'co2_mu_pvt'  , [prange, trange]       , ...
                       'wat_mu_ref'  , muw                    , ...
@@ -155,14 +155,22 @@ schedule.control(2).W.val = 0;
 
 % Specifying length of simulation timesteps
 isteps = rampupTimesteps(25*year, year/2, 7);
-msteps = rampupTimesteps(200*year, 5 * year, 7);
+%msteps = rampupTimesteps(200*year, 5 * year, 7);
+msteps = rampupTimesteps(200*year, 2 * year, 7);
 
 % schedule.step.val = [isteps]; % @@
 % schedule.step.control = [ones(numel(isteps), 1)]; % @@ 
 
+%isteps = isteps(1:10); % @@@
+
 schedule.step.val = [isteps; msteps];
 schedule.step.control = [ones(numel(isteps), 1); ...
                          2*ones(numel(msteps), 1)];
+
+% schedule.step.val = [isteps; msteps(1:7)];
+% schedule.step.control = [ones(numel(isteps), 1); ...
+%                          2*ones(7, 1)];
+
 
 % run simulation
 model = CO2VEBlackOilTypeModel(Gt, rockVE, fluid);
@@ -178,5 +186,5 @@ mrstModule add mrst-gui
 %plotToolbar(Gt, states); view(0,90);
 
 
-states3D = VEstates23D(states, Gt, model.fluid, 'poro3D', rocks.poro);
+tic; states3D = VEstates23D(states, Gt, model.fluid, 'poro3D', rocks.poro);toc
 plotToolbar(Gt.parent, states3D); view(0,90);
