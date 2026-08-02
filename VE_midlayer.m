@@ -187,4 +187,5 @@ mrstModule add mrst-gui
 
 
 tic; states3D = VEstates23D(states, Gt, model.fluid, 'poro3D', rocks.poro);toc
+colormap(custom_jet_colormap(256))
 plotToolbar(Gt.parent, states3D); view(0,90);
